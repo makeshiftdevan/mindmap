@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive AP Physics Curriculum Mind Map</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  
+  <!-- Block local storage globally before any script runs -->
+  <script type="text/javascript">
+    // Create a secure localStorage disabler
+    (function() {
+      try {
+        // Save original methods
+        var originalLocalStorage = window.localStorage;
+        var originalSessionStorage = window.sessionStorage;
+        
+        // Create empty storage objects
+        var emptyStorage = {
+          getItem: function() { return null; },
+          setItem: function() { return null; },
+          removeItem: function() { return null; },
+          clear: function() { return null; },
+          key: function() { return null; },
+          length: 0
+        };
+        
+        // Replace storage objects with empty implementations
+        Object.defineProperty(window, 'localStorage', {
+          get: function() { return emptyStorage; }
+        });
+        
+        Object.defineProperty(window, 'sessionStorage', {
+          get: function() { return emptyStorage; }
+        });
+        
+        console.log('Local storage access has been disabled');
+      } catch (e) {
+        console.error('Error disabling storage:', e);
+      }
+    })();
+  </script>
+  
+  <!-- Configure MathJax with updated settings -->
+  <script type="text/javascript">
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        packages: {'[+]': ['boldsymbol']}
+      },
+      svg: {
+        fontCache: 'none'  // Changed from 'global' to 'none' to avoid storage
+      },
+      startup: {
+        typeset: true
+      },
+      options: {
+        enableLocalStorage: false,
+        safeWindow: {
+          disable: true
+        }
+      },
+      loader: {
+        load: ['input/tex', 'output/svg']
+      }
+    };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" id="MathJax-script" async></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+      background-color: transparent;
+      color: #f5f5f5;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #mindmap-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #info-panel {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: 400px;
+      height: calc(100% - 40px);
+      background-color: rgba(40, 40, 40, 0.95);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      overflow-y: auto;
+      transform: translateX(450px);
+      transition: transform 0.3s ease-in-out;
+      z-index: 1000;
+    }
+
+    #info-panel.active {
+      transform: translateX(0);
+    }
+
+    #info-panel h2 {
+      margin-top: 0;
+      color: #BB86FC;
+      border-bottom: 1px solid #555;
+      padding-bottom: 8px;
+    }
+
+    #info-panel h3 {
+      color: #03DAC6;
+      margin: 15px 0 5px 0;
+    }
+
+    #info-panel p {
+      margin: 5px 0;
+      line-height: 1.4;
+    }
+
+    #info-panel .info-equations {
+      background-color: rgba(20, 20, 20, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      margin: 10px 0;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    #info-panel .connections-list {
+      padding-left: 20px;
+    }
+
+    #info-panel .connections-list li {
+      margin-bottom: 8px;
+    }
+
+    #info-panel .close-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node circle {
+      stroke-width: 2px;
+      transition: transform 0.2s ease-in-out;
+    }
+    
+    .node:hover circle {
+      transform: scale(1.1);
+    }
+
+    .node text {
+      font-size: 14px;
+      font-weight: bold;
+      pointer-events: none;
+      text-anchor: middle;
+      fill: white;
+      text-shadow: 0 0 3px #000000;
+    }
+
+    .node text.topic-text {
+      font-size: 12px;
+      font-weight: normal;
+    }
+
+    .link {
+      stroke-opacity: 0;
+      stroke-width: 1.5px;
+      stroke: #ffffff;
+      transition: stroke-opacity 0.3s ease;
+    }
+
+    .content-link {
+      stroke-dasharray: 5, 5;
+      stroke-width: 2px;
+    }
+
+    .topic-link {
+      stroke-width: 1px;
+    }
+
+    .title {
+      text-align: center;
+      padding: 10px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #FFFFFF;
+      text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background-color: rgba(30, 30, 30, 0.7);
+      border-radius: 10px;
+      padding: 10px 20px;
+    }
+    
+    /* Toggle for Physics C equations */
+    .physics-c-button {
+      background: #3D5AFE;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin-top: 10px;
+      cursor: pointer;
+      display: block;
+    }
+    
+    .physics-c-button:hover {
+      background: #536DFE;
+    }
+    
+    .physics-c-equations {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background-color: rgba(10, 10, 10, 0.5);
+      border-left: 3px solid #536DFE;
+      border-radius: 4px;
+    }
+    
+    .equation {
+      white-space: nowrap;
+      line-height: 1.8;
+      font-family: 'Times New Roman', Times, serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">AP PhysicsCurriculum Mind Map</div>
+  
+  <div id="mindmap-container"></div>
+  
+  <div id="info-panel">
+    <button class="close-button">&times;</button>
+    <h2>Topic Information</h2>
+    <div id="info-content">
+      <p>Click on any topic in the mind map to see detailed information about it.</p>
+    </div>
+  </div>
+
+  <script>
+       // Wait for the DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Define the data structure for the mind map
+      const mindmapData = {
+        id: "center",
+        name: "AP Physics",
+        description: "AP Physics is a university-level physics course that explores foundational principles of physics and their applications.",
+        color: "#8E44AD",
+        radius: 50,
+        children: [
+          {
+            id: "unit1",
+            name: "Kinematics",
+            description: "The study of motion without consideration of the causes of motion.",
+            essentialKnowledge: "The kinematics unit covers motion along a straight line, motion in a plane, including vector representations, projectile motion, and reference frames.",
+            equations: "x = x_0 + v_0 t + \\frac{1}{2}at^2\\\\v = v_0 + at\\\\v^2 = v_0^2 + 2a(x-x_0)",
+            physicsC: "\\frac{dr}{dt} = v\\\\\\frac{dv}{dt} = a\\\\\\Delta x = \\int_{t_1}^{t_2} v(t)dt\\\\\\Delta v = \\int_{t_1}^{t_2} a(t)dt",
+            color: "#FF5722",
+            weight: "10-15% of exam",
+            radius: 40,
+            connections: ["unit2", "unit4"],
+            children: [
+              {
+                id: "topic1.1",
+                name: "Scalars and Vectors",
+                description: "Understanding the difference between scalar and vector quantities in one dimension.",
+                essentialKnowledge: "Scalars are quantities described by magnitude only, while vectors have both magnitude and direction. Distance, time, and speed are scalar quantities; position, displacement, velocity, and acceleration are vectors.",
+                equations: "Vector \\ notation: \\ v = v_0 + at\\\\Component \\ form: \\ v_x = v_{0x} + a_x t",
+                physicsC: "A \\cdot B = AB\\cos\\theta\\\\|A\\times B| = AB\\sin\\theta",
+                color: "#FF7043",
+                radius: 25,
+                connections: ["topic2.5", "topic4.1"]
+              },
+              {
+                id: "topic1.2",
+                name: "Displacement, Velocity, and Acceleration",
+                description: "Defining and calculating displacement, velocity, and acceleration.",
+                essentialKnowledge: "Displacement is the change in an object's position. Average velocity is displacement divided by time interval. Average acceleration is the change in velocity divided by time interval. An object accelerates when its velocity changes in magnitude and/or direction.",
+                equations: "\\Delta x = x_f - x_0\\\\v_{avg} = \\frac{\\Delta x}{\\Delta t}\\\\a_{avg} = \\frac{\\Delta v}{\\Delta t}",
+                physicsC: "v = \\frac{dr}{dt}\\\\a = \\frac{dv}{dt}",
+                color: "#FF7043",
+                radius: 25,
+                connections: ["topic2.5", "topic4.2"]
+              },
+              {
+                id: "topic1.3",
+                name: "Representing Motion",
+                description: "Using diagrams, graphs, and equations to represent motion.",
+                essentialKnowledge: "Motion can be represented by motion diagrams, figures, graphs, equations, and narrative descriptions. Graphs of position, velocity, and acceleration as functions of time can be used to find the relationships between those quantities.",
+                equations: "For \\ constant \\ acceleration:\\\\v = v_0 + at\\\\x = x_0 + v_0t + \\frac{1}{2}at^2\\\\v^2 = v_0^2 + 2a(x-x_0)",
+                physicsC: "\\Delta x = \\int v_x(t)dt\\\\\\Delta v_x = \\int a_x(t)dt",
+                color: "#FF7043",
+                radius: 25,
+                connections: ["topic5.1"]
+              },
+              {
+                id: "topic1.4",
+                name: "Reference Frames and Relative Motion",
+                description: "Analyzing motion from different reference frames.",
+                essentialKnowledge: "The choice of reference frame determines the direction and magnitude of measured quantities. Measurements from one reference frame can be converted to another. The velocity of an object combines the object's velocity and the observer's reference frame velocity.",
+                equations: "Relative velocity: v_{apparent} = v_{object} - v_{frameOfRef}",
+                physicsC: "Reference frame transforms for position, velocity, and acceleration",
+                color: "#FF7043",
+                radius: 25,
+                connections: ["topic2.4"]
+              },
+              {
+                id: "topic1.5",
+                name: "Motion in Two or Three Dimensions",
+                description: "Analyzing motion in a plane using vector components.",
+                essentialKnowledge: "Vectors can be resolved into perpendicular components. Motion in two dimensions can be analyzed using one-dimensional kinematic relationships if separated into components. Projectile motion is a special case with zero acceleration in one dimension and constant acceleration in the other. Horizontally launched- use x =v_{o_{x}}t and use y = \\frac{1}{2} gt^2 to get t.",
+                equations: "Vector \\ components: \\ a^2 + b^2 = c^2\\\\sin\\theta = \\frac{a}{c}, cos\\theta = \\frac{b}{c}, tan\\theta = \\frac{a}{b}",
+                physicsC: "r(t) = r_0 + v_0 t + \\frac{1}{2}gt^2",
+                color: "#FF7043",
+                radius: 25,
+                connections: ["topic2.9", "topic2.10"]
+              }
+            ]
+          },
+          {
+            id: "unit2",
+            name: "Force and Translational Dynamics",
+            description: "The study of the causes of motion and the relationship between force and motion.",
+            essentialKnowledge: "Force and dynamics cover Newton's laws of motion, different types of forces, free-body diagrams, and applications including gravitational, frictional, spring, and circular motion forces.",
+            equations: "F_{net} = ma\\\\F_{12} = -F_{21}\\\\f = \\mu N\\\\F_{spring} = -k\\Delta x\\\\F_g = G\\frac{m_1m_2}{r^2}",
+            physicsC: "F_{net} = \\frac{dp}{dt}",
+            color: "#2196F3",
+            weight: "18-23% of exam",
+            radius: 40,
+            connections: ["unit1", "unit3", "unit4", "unit5"],
+            children: [
+              {
+                id: "topic2.1",
+                name: "Systems and Center of Mass",
+                description: "Analyzing systems of objects and their center of mass.",
+                essentialKnowledge: "System properties are determined by the interactions between objects. The center of mass of a system with symmetrical mass distributions is located on lines of symmetry. A system can be modeled as a single object located at its center of mass.",
+                equations: "x_{cm} = \\frac{\\sum m_i x_i}{\\sum m_i}\\\\v_{cm} = \\frac{\\sum m_i v_i}{\\sum m_i}\\\\a_{cm} = \\frac{\\sum m_i a_i}{\\sum m_i}",
+                physicsC: "r_{cm} = \\frac{\\int r\\,dm}{\\int dm}",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.1", "topic4.1", "topic5.4"]
+              },
+              {
+                id: "topic2.2",
+                name: "Forces and Free-Body Diagrams",
+                description: "Representing forces using free-body diagrams.",
+                essentialKnowledge: "Forces \\ are \\ vectors quantities that describe interactions between objects. A force exerted on an object is always due to interaction with another object. Free-body diagrams show each force exerted on an object by the environment. Label the FBD!",
+                equations: "Force \\ is \\ a \\ vector: \\ F",
+                physicsC: "F_{net} = \\sum F_i",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.2", "topic4.2", "topic5.3"]
+              },
+              {
+                id: "topic2.3",
+                name: "Newton's Third Law",
+                description: "If object A exerts a force on object B, object B exerts a force on object A with same force type, magnitude and opposite direction",
+                essentialKnowledge: "Newton's third law describes the interaction of two objects in terms of paired forces that each exerts on the other. Interactions between objects within a system do not influence the motion of a system's center of mass. For force pairs to be seen, there must be two objects being analyzed.",
+                equations: "F_{12} = -F_{21}",
+                physicsC: "Third \\ law \\ pairs: \\ same \\ magnitude \\ & \\type, \\ opposite \\ direction, \\ different \\ objects",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic4.3"]
+              },
+              {
+                id: "topic2.4",
+                name: "Newton's First Law",
+                description: "When a ody is in equilibrium, the body has a constant velocity",
+                essentialKnowledge: "Translational equilibrium is the configuration of forces such that the net force exerted on a system is zero. Newton's first law states that if the net force exerted on a system is zero, the velocity will remain constant.",
+                equations: "\\sum F = 0 \\rightarrow v \\ = \\ constant",
+                physicsC: "Inertial \\ reference \\ frames \\ where \\ Newton's \\ first \\ law \\ is \\ valid",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic5.5"]
+              },
+              {
+                id: "topic2.5",
+                name: "Newton's Second Law",
+                description: "The acceleration of an object is proportional to the net force and inversely proportional to its mass.  The only way to stop constant velocity is to exert a force",
+                essentialKnowledge: "The acceleration of a system's center of mass has a magnitude proportional to the net force exerted on the system and is in the same direction as that net force. The velocity of a system's center of mass will only change if a nonzero net external force is exerted on that system.",
+                equations: "F_{net} = ma\\\\F_{net} = \\ (Stuff \\ that \\ makes \\ it\\  go) \\ - \\ (Stuff \\ holding \\ it \\ back) \\ = \\ ma",
+                physicsC: "F_{net} = \\frac{dp}{dt}",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.2", "topic4.2", "topic5.6"]
+              },
+              {
+                id: "topic2.6",
+                name: "Gravitational Force",
+                description: "The force of attraction between masses.",
+                essentialKnowledge: "Newton's law of universal gravitation describes the gravitational force as directly proportional to masses and inversely proportional to distance squared. Weight is the gravitational force exerted by an astronomical body on a small nearby object.",
+                equations: "F_g = G\\frac{m_1m_2}{r^2}\\\\Weight = mg",
+                physicsC: "Gravitational field: g = -G\\frac{M}{r^2}\\hat{r}",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.3", "topic6.6"]
+              },
+              {
+                id: "topic2.7",
+                name: "Kinetic and Static Friction",
+                description: "Forces that resist relative motion between surfaces in contact.",
+                essentialKnowledge: "Kinetic friction occurs when surfaces move relative to each other. Static friction occurs between non-moving surfaces. The magnitude of friction force depends on the normal force and the coefficient of friction. The direction of friction opposes SLIDING",
+                equations: "f_k = \\mu_k N\\\\f_s \\leq \\mu_s N",
+                physicsC: "Microscopic origin of friction forces",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.4", "topic6.5"]
+              },
+              {
+                id: "topic2.8",
+                name: "Spring Forces",
+                description: "Forces exerted by springs that are proportional to displacement from equilibrium.",
+                essentialKnowledge: "The force exerted by an ideal spring is proportional to the displacement from its relaxed length. This force is always directed toward the equilibrium position.",
+                equations: "F_s = -kx",
+                physicsC: "Elastic \\ potential \\ energy: \\ U_s = \\frac{1}{2}kx^2",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.3", "topic7.1"]
+              },
+              {
+                id: "topic2.9",
+                name: "Resistive Forces",
+                description: "Forces that oppose the motion of objects through fluids.",
+                essentialKnowledge: "A resistive force is a velocity-dependent force in the opposite direction of an object's velocity. Terminal velocity is reached when the net force exerted on the object is zero.",
+                equations: "F_r = -kv",
+                physicsC: "F_r = -bv or F_r = -cv^2",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic3.4"]
+              },
+              {
+                id: "topic2.10",
+                name: "Circular Motion",
+                description: "Motion of objects traveling in circular paths.",
+                essentialKnowledge: "Centripetal acceleration is directed toward the center of circular motion with magnitude v²/r. Centripetal acceleration can result from various forces. For uniform circular motion, the period T = 2πr/v.",
+                equations: "a_c = \\frac{v^2}{r}\\\\a_c = \\frac{4\\pi^2r}{T^2}",
+                physicsC: "a_c = \\frac{v^2}{r}\\hat{r} = r\\omega^2\\hat{r}",
+                color: "#42A5F5",
+                radius: 20,
+                connections: ["topic5.1", "topic6.6"]
+              }
+            ]
+          },
+          {
+            id: "unit3",
+            name: "Work, Energy, and Power",
+            description: "The study of energy transfer and transformation.",
+            essentialKnowledge: "This unit covers kinetic energy, potential energy, work-energy theorem, conservation of energy, and power.",
+            equations: "W = Fd \\cos \\theta\\\\K = \\frac{1}{2}mv^2\\\\P = \\frac{W}{t}",
+            physicsC: "W = \\int F \\cdot dr\\\\U = -\\int F \\cdot dr\\\\P = \\frac{dW}{dt} = F \\cdot v",
+            color: "#9C27B0",
+            weight: "18-23% of exam",
+            radius: 40,
+            connections: ["unit2", "unit4", "unit6"],
+            children: [
+              {
+                id: "topic3.1",
+                name: "Translational Kinetic Energy",
+                description: "Energy associated with an object's motion.",
+                essentialKnowledge: "Translational kinetic energy is given by K = ½mv². It is a scalar quantity that may be viewed differently by observers in different reference frames.",
+                equations: "K = \\frac{1}{2}mv^2",
+                physicsC: "K = \\frac{1}{2}mv^2 \\ for \\ any \\ reference \\ frame",
+                color: "#BA68C8",
+                radius: 20,
+                connections: ["topic6.1"]
+              },
+              {
+                id: "topic3.2",
+                name: "Work",
+                description: "Energy transferred by a force moving through a displacement.",
+                essentialKnowledge: "Work is energy transferred into or out of a system by a force exerted over a distance. The amount of work done by a constant force is related to the components of that force and displacement. The work-energy theorem states that the change in kinetic energy equals the net work done.",
+                equations: "W = F\\cdot d = Fd \\cos \\theta\\\\W = ΔK",
+                physicsC: "W = \\int F \\cdot dr",
+                color: "#BA68C8",
+                radius: 20,
+                connections: ["topic6.2"]
+              },
+              {
+                id: "topic3.3",
+                name: "Potential Energy",
+                description: "Energy associated with the position or configuration of objects.",
+                essentialKnowledge: "Potential energy is associated with conservative forces. Common forms include gravitational potential energy (U_g = mgh) and elastic potential energy of springs (U_s = ½kx²).",
+                equations: "U_g = mgh\\\\U_s = \\frac{1}{2}kx^2",
+                physicsC: "U_g = -\\frac{GMm}{r}\\\\U_s = \\frac{1}{2}kx^2",
+                color: "#BA68C8",
+                radius: 20,
+                connections: ["topic7.4"]
+              },
+              {
+                id: "topic3.4",
+                name: "Conservation of Energy",
+                description: "Principle that energy cannot be created or destroyed.",
+                essentialKnowledge: "Mechanical energy is the sum of kinetic and potential energies. The total energy of a system is constant if no external work is done on the system. Any change in energy must be accounted for by energy transfer.",
+                equations: "E_{total} = K + U\\\\ΔE_{system} = W_{external}",
+                physicsC: "E_{total} \\ = \\ constant \\ for \\ isolated \\ systems",
+                color: "#BA68C8",
+                radius: 20,
+                connections: ["topic4.4", "topic6.3", "topic7.4"]
+              },
+              {
+                id: "topic3.5",
+                name: "Power",
+                description: "Rate of energy transfer or work done.",
+                essentialKnowledge: "Power is the rate at which energy changes, either by transfer or conversion. Average power is energy transferred divided by time. Power can also be calculated as force times velocity.",
+                equations: "P = \\frac{W}{t} = \\frac{ΔE}{t}\\\\P = F\\cdot v = Fv \\cos \\theta",
+                physicsC: "P = \\frac{dW}{dt} = F \\cdot v",
+                color: "#BA68C8",
+                radius: 20,
+                connections: []
+              }
+            ]
+          },
+          {
+            id: "unit4",
+            name: "Linear Momentum",
+            description: "The study of the product of mass and velocity, and its conservation.",
+            essentialKnowledge: "This unit covers momentum, impulse-momentum theorem, conservation of momentum, and collisions.",
+            equations: "p = mv\\\\F\\Delta t = \\Delta p\\\\p_i = p_f",
+            physicsC: "J = \\int Fdt = \\Delta p\\\\p_{sys} = \\sum_i m_iv_i",
+            color: "#F44336",
+            weight: "10-15% of exam",
+            radius: 40,
+            connections: ["unit1", "unit2", "unit3"],
+            children: [
+              {
+                id: "topic4.1",
+                name: "Linear Momentum",
+                description: "Product of mass and velocity, a conserved vector quantity.",
+                essentialKnowledge: "Linear momentum is defined by p = mv. Momentum is a vector quantity with the same direction as velocity. Momentum is used to analyze collisions and explosions.",
+                equations: "p = mv",
+                physicsC: "p_{sys} = \\sum_i m_iv_i",
+                color: "#EF5350",
+                radius: 25,
+                connections: ["topic6.3"]
+              },
+              {
+                id: "topic4.2",
+                name: "Change in Momentum and Impulse",
+                description: "Relationship between force applied over time and momentum change.",
+                essentialKnowledge: "The rate of change of momentum equals the net force. Impulse is the product of average force and time interval. The impulse-momentum theorem states that impulse equals change in momentum.",
+                equations: "J = F_{avg}\\cdot\\Delta t = \\Delta p\\\\F_{net} = \\frac{dp}{dt}",
+                physicsC: "J = \\int_{t_1}^{t_2} F_{net}(t)dt",
+                color: "#EF5350",
+                radius: 25,
+                connections: ["topic6.3"]
+              },
+              {
+                id: "topic4.3",
+                name: "Conservation of Linear Momentum",
+                description: "Principle that momentum is conserved in the absence of external forces.",
+                essentialKnowledge: "The total momentum of a system is the sum of the momenta of its constituent parts. In the absence of net external forces, the total momentum of a system remains constant. Any change in momentum requires an impulse.",
+                equations: "p_{total} = \\sum p_i\\\\p_{initial} = p_{final} \\text{ (if } F_{net,ext} = 0\\text{)}",
+                physicsC: "Conservation of momentum in all three dimensions",
+                color: "#EF5350",
+                radius: 25,
+                connections: ["topic6.4"]
+              },
+              {
+                id: "topic4.4",
+                name: "Elastic and Inelastic Collisions",
+                description: "Interactions where momentum is conserved but energy may not be.",
+                essentialKnowledge: "In elastic collisions, both momentum and kinetic energy are conserved. In inelastic collisions, momentum is conserved but kinetic energy decreases. In perfectly inelastic collisions, objects stick together after collision.",
+                equations: "p_{initial} = p_{final}\\\\K_{initial} = K_{final} \\text{ (elastic \\ only)}",
+                physicsC: "1D \\ elastic \\ collision:\\\\ v'_1 - v'_2 = -(v_1 - v_2)",
+                color: "#EF5350",
+                radius: 25,
+                connections: ["topic3.4"]
+              }
+            ]
+          },
+          {
+            id: "unit5",
+            name: "Torque and Rotational Dynamics",
+            description: "The study of rotational forces and their effects.",
+            essentialKnowledge: "This unit covers rotational kinematics, torque, rotational inertia, and rotational forms of Newton's laws.",
+            equations: "\\tau = r \\times F\\\\\\tau = rF \\sin \\theta\\\\\\tau_{net} = I\\alpha",
+            physicsC: "\\tau = r \\times F\\\\I = \\int r^2 dm\\\\\\tau_{net} = I\\alpha",
+            color: "#00BCD4",
+            weight: "10-15% of exam",
+            radius: 40,
+            connections: ["unit2", "unit6"],
+            children: [
+              {
+                id: "topic5.1",
+                name: "Rotational Kinematics",
+                description: "Description of rotational motion using angular quantities.",
+                essentialKnowledge: "Angular displacement, velocity, and acceleration describe rotational motion. For constant angular acceleration, kinematic equations analogous to linear motion apply.",
+                equations: "\\theta = \\theta_0 + \\omega_0t + \\frac{1}{2}\\alpha t^2\\\\\\omega = \\omega_0 + \\alpha t\\\\\\omega^2 = \\omega_0^2 + 2\\alpha(\\theta-\\theta_0)",
+                physicsC: "\\omega = \\frac{d\\theta}{dt}\\\\\\alpha = \\frac{d\\omega}{dt}",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic1.3", "topic2.10", "topic7.1"]
+              },
+              {
+                id: "topic5.2",
+                name: "Connecting Linear and Rotational Motion",
+                description: "Relationships between linear and angular quantities.",
+                essentialKnowledge: "Linear distance, velocity, and acceleration of a point at distance r from the axis of rotation relate to angular quantities: s = rθ, v = rω, a = rα. All points in a rigid system have the same angular velocity and acceleration.",
+                equations: "s = r\\theta\\\\v = r\\omega\\\\a = r\\alpha",
+                physicsC: "v = \\omega \\times r\\\\a = \\alpha \\times r + \\omega \\times (\\omega \\times r)",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic6.5"]
+              },
+              {
+                id: "topic5.3",
+                name: "Torque",
+                description: "Rotational analog of force, causing rotation.",
+                essentialKnowledge: "Torque results from the force component perpendicular to the position vector from the axis of rotation. The magnitude of torque equals force times lever arm times sine of the angle between them.",
+                equations: "\\tau = rF \\sin \\theta\\\\\\tau = r_\\perp F",
+                physicsC: "\\tau = r \\times F",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic6.2"]
+              },
+              {
+                id: "topic5.4",
+                name: "Rotational Inertia",
+                description: "Resistance of an object to changes in rotational motion.",
+                essentialKnowledge: "Rotational inertia (moment of inertia) measures a system's resistance to changes in rotation. For a point mass at distance r from the axis, I = mr². The total rotational inertia is the sum of individual inertias.",
+                equations: "I = \\sum m_i r_i^2\\\\I_{new} = I_{cm} + Md^2\\\\ I_complexObject = \\sum I",
+                physicsC: "I = \\int r^2 dm",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic6.1"]
+              },
+              {
+                id: "topic5.5",
+                name: "Rotational Equilibrium and Newton's First Law in Rotational Form",
+                description: "Conditions for rotational equilibrium.",
+                essentialKnowledge: "Rotational equilibrium occurs when net torque is zero. A system in rotational equilibrium has constant angular velocity. A system can be in rotational equilibrium without being in translational equilibrium, and vice versa.",
+                equations: "\\sum \\tau = 0 → \\omega = \\text{constant}",
+                physicsC: "Conditions \\ for \\ static \\equilibrium: \\sum F = 0 and \\sum \\tau = 0",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic2.4"]
+              },
+              {
+                id: "topic5.6",
+                name: "Newton's Second Law in Rotational Form",
+                description: "Relationship between torque, rotational inertia, and angular acceleration.",
+                essentialKnowledge: "The rate of change of angular velocity (angular acceleration) is directly proportional to the net torque and inversely proportional to the rotational inertia. This is the rotational analog of Newton's second law.",
+                equations: "\\tau_{net} = I\\alpha",
+                physicsC: "\\tau_{net} = I\\alpha",
+                color: "#4DD0E1",
+                radius: 20,
+                connections: ["topic2.5"]
+              }
+            ]
+          },
+          {
+            id: "unit6",
+            name: "Energy and Momentum of Rotating Systems",
+            description: "The study of energy and momentum conservation in rotational systems.",
+            essentialKnowledge: "This unit covers rotational energy, angular momentum, conservation of angular momentum, rolling motion, and orbital mechanics.",
+            equations: "K_{rot} = \\frac{1}{2}I\\omega^2\\\\L = I\\omega\\\\L = mvr \\sin \\theta",
+            physicsC: "K_{rot} = \\frac{1}{2}I\\omega^2\\\\L = I\\omega\\\\L = r \\times p",
+            color: "#3F51B5",
+            weight: "5-8% of exam",
+            radius: 40,
+            connections: ["unit3", "unit5", "unit7"],
+            children: [
+              {
+                id: "topic6.1",
+                name: "Rotational Kinetic Energy",
+                description: "Energy associated with rotational motion.",
+                essentialKnowledge: "Rotational kinetic energy relates to rotational inertia and angular velocity. For a rigid system, total kinetic energy includes both translational and rotational components.",
+                equations: "K_{rot} = \\frac{1}{2}I\\omega^2\\\\K_{total} = K_{trans} + K_{rot}",
+                physicsC: "K_{total} = \\frac{1}{2}mv_{cm}^2 + \\frac{1}{2}I_{cm}\\omega^2",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic3.1", "topic5.4"]
+              },
+              {
+                id: "topic6.2",
+                name: "Torque and Work",
+                description: "Work done by torque in rotational motion.",
+                essentialKnowledge: "Torque transfers energy into or out of a rotating system when exerted over an angular displacement. Work done by torque equals the product of torque and angular displacement.",
+                equations: "W = \\tau\\theta",
+                physicsC: "W = \\int \\tau d\\theta",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic3.2", "topic5.3"]
+              },
+              {
+                id: "topic6.3",
+                name: "Angular Momentum and Angular Impulse",
+                description: "Rotational analog of linear momentum and impulse.",
+                essentialKnowledge: "Angular momentum of a rigid system is the product of rotational inertia and angular velocity. Angular impulse equals the product of torque and time interval, which equals the change in angular momentum.",
+                equations: "L = I\\omega\\\\L = rmv \\sin \\theta\\\\\\tau\\Delta t = \\Delta L",
+                physicsC: "L = r \\times p\\\\\\Delta L = \\int \\tau dt",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic4.1", "topic4.2"]
+              },
+              {
+                id: "topic6.4",
+                name: "Conservation of Angular Momentum",
+                description: "Principle that angular momentum is conserved in the absence of external torques.",
+                essentialKnowledge: "In the absence of net external torque, the total angular momentum of a system remains constant. The angular impulse exerted on a system equals its change in angular momentum.",
+                equations: "L = \\text{constant (if } \\tau_{net,ext} = 0\\text{)}\\\\\\Delta L = \\tau_{net,ext}\\Delta t",
+                physicsC: "L_{total} = \\sum L_i = constant when \\tau_{ext} = 0",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic4.3"]
+              },
+              {
+                id: "topic6.5",
+                name: "Rolling",
+                description: "Combined translational and rotational motion of rigid objects.",
+                essentialKnowledge: "The total kinetic energy of a rolling object combines translational and rotational components. For rolling without slipping, v = rω (both types of kinetic energies, both net force and net torque: \\alpha = \\frac {a}{r}. For ideal rolling without slipping, friction does not dissipate energy.",
+                equations: "K_{tot} = K_{trans} + K_{rot}\\\\v = r\\omega \\text{ (rolling \\ without \\ slipping)}",
+                physicsC: "K_{rolling} = \\frac{1}{2}mv^2 + \\frac{1}{2}I\\omega^2 = \\frac{1}{2}(m + \\frac{I}{r^2})v^2",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic2.7", "topic5.2"]
+              },
+              {
+                id: "topic6.6",
+                name: "Motion of Orbiting Satellites",
+                description: "Application of gravitation and circular motion to orbital mechanics.",
+                essentialKnowledge: "In circular orbits, gravitational force provides centripetal acceleration. Orbital motion is governed by energy and angular momentum conservation. Escape velocity is the minimum speed needed to escape a gravitational field.",
+                equations: "T^2 = \\frac{4\\pi^2}{GM}r^3\\\\v_{esc} = \\sqrt{\\frac{2GM}{r}}",
+                physicsC: "E_{orbital} = -\\frac{GMm}{2r}\\\\L_{orbital} = mvr = constant",
+                color: "#7986CB",
+                radius: 20,
+                connections: ["topic2.6", "topic2.10"]
+              }
+            ]
+          },
+          {
+            id: "unit7",
+            name: "Oscillations",
+            description: "The study of repetitive motion about an equilibrium position.",
+            essentialKnowledge: "This unit covers simple harmonic motion, frequency and period, analyzing oscillation, and energy of oscillators.",
+            equations: "T = 2\\pi\\sqrt{\\frac{m}{k}}\\\\T = 2\\pi\\sqrt{\\frac{L}{g}}\\\\x = A\\cos(2\\pi ft)",
+            physicsC: "\\frac{d^2x}{dt^2} = -\\omega^2 x\\\\x = A\\cos(\\omega t + \\phi)\\\\E_{total} = \\frac{1}{2}kA^2",
+            color: "#FFC107",
+            weight: "5-8% of exam",
+            radius: 40,
+            connections: ["unit6"],
+            children: [
+              {
+                id: "topic7.1",
+                name: "Defining Simple Harmonic Motion (SHM)",
+                description: "Motion where the restoring force is proportional to displacement.",
+                essentialKnowledge: "Simple harmonic motion (SHM) is a special case of periodic motion where the restoring force is proportional to displacement from equilibrium. Examples include mass-spring systems and pendulums (for small angles).",
+                equations: "F = -kx\\\\F = -mg\\sin \\theta \\approx -mg(\\theta) \\text{ for small } \\theta",
+                physicsC: "F = -kx = ma \\Rightarrow \\frac{d^2x}{dt^2} = -\\frac{k}{m}x = -\\omega^2x",
+                color: "#FFD54F",
+                radius: 20,
+                connections: ["topic2.8", "topic5.1"]
+              },
+              {
+                id: "topic7.2",
+                name: "Frequency and Period of SHM",
+                description: "Time characteristics of oscillatory motion.",
+                essentialKnowledge: "Period (T) is the time for one full oscillation. Frequency (f) is the number of oscillations per unit time. For a mass-spring system, T = 2π√(m/k). For a simple pendulum, T = 2π√(L/g).",
+                equations: "T = \\frac{1}{f}\\\\T = 2\\pi\\sqrt{\\frac{m}{k}}\\\\T = 2\\pi\\sqrt{\\frac{L}{g}}",
+                physicsC: "\\omega = \\sqrt{\\frac{k}{m}} = 2\\pi f = \\frac{2\\pi}{T}",
+                color: "#FFD54F",
+                radius: 20,
+                connections: []
+              },
+              {
+                id: "topic7.3",
+                name: "Representing and Analyzing SHM",
+                description: "Mathematical and graphical analysis of simple harmonic motion.",
+                essentialKnowledge: "Position in SHM follows sinusoidal functions. Velocity and acceleration are also sinusoidal but phase-shifted. Amplitude affects only the maximum displacement, not the period.",
+                equations: "x = A\\cos(2\\pi ft)\\\\v = -A\\omega \\sin(\\omega t)\\\\a = -A\\omega^2 \\cos(\\omega t)",
+                physicsC: "x = A\\cos(\\omega t + \\phi)\\\\v = -\\omega A\\sin(\\omega t + \\phi)\\\\a = -\\omega^2 A\\cos(\\omega t + \\phi)",
+                color: "#FFD54F",
+                radius: 20,
+                connections: []
+              },
+              {
+                id: "topic7.4",
+                name: "Energy of Simple Harmonic Oscillators",
+                description: "Analysis of energy transformations in oscillatory motion.",
+                essentialKnowledge: "The total energy (kinetic plus potential) of a system in SHM is constant. Energy continuously transforms between kinetic and potential, with maximum potential energy at maximum displacement and maximum kinetic energy at equilibrium.",
+                equations: "E_{total} = K + U = \\text{constant}\\\\E_{total} = \\frac{1}{2}kA^2",
+                physicsC: "K = \\frac{1}{2}mv^2 = \\frac{1}{2}m\\omega^2A^2\\sin^2(\\omega t + \\phi)\\\\U = \\frac{1}{2}kx^2 = \\frac{1}{2}kA^2\\cos^2(\\omega t + \\phi)",
+                color: "#FFD54F",
+                radius: 20,
+                connections: ["topic3.3", "topic3.4"]
+              },
+              {
+                id: "topic7.5",
+                name: "Simple and Physical Pendulums",
+                description: "Oscillating motion of pendulums about a pivot point.",
+                essentialKnowledge: "A physical pendulum is a rigid body that oscillates about a fixed axis. A simple pendulum is a special case consisting of a point mass at the end of a massless string.",
+                equations: "T_{phys} = 2\\pi\\sqrt{\\frac{I}{mgd}}\\\\T_p = 2\\pi\\sqrt{\\frac{\\ell}{g}}",
+                physicsC: "T_{torsion} = 2\\pi\\sqrt{\\frac{I}{\\kappa}}",
+                color: "#FFD54F",
+                radius: 20,
+                connections: []
+              }
+            ]
+          }
+        ]
+      };
+
+      // Define connections between nodes
+      const connections = [
+        // Unit to Unit connections
+        { source: "unit1", target: "unit2", type: "connection" },
+        { source: "unit2", target: "unit3", type: "connection" },
+        { source: "unit2", target: "unit4", type: "connection" },
+        { source: "unit2", target: "unit5", type: "connection" },
+        { source: "unit3", target: "unit4", type: "connection" },
+        { source: "unit3", target: "unit6", type: "connection" },
+        { source: "unit5", target: "unit6", type: "connection" },
+        { source: "unit6", target: "unit7", type: "connection" },
+        
+        // Cross-topic connections
+        { source: "topic1.1", target: "topic2.5", type: "connection" },
+        { source: "topic1.1", target: "topic4.1", type: "connection" },
+        { source: "topic1.2", target: "topic2.5", type: "connection" },
+        { source: "topic1.2", target: "topic4.2", type: "connection" },
+        { source: "topic1.3", target: "topic5.1", type: "connection" },
+        { source: "topic1.4", target: "topic2.4", type: "connection" },
+        { source: "topic1.5", target: "topic2.9", type: "connection" },
+        { source: "topic1.5", target: "topic2.10", type: "connection" },
+        
+        { source: "topic2.1", target: "topic3.1", type: "connection" },
+        { source: "topic2.1", target: "topic4.1", type: "connection" },
+        { source: "topic2.1", target: "topic5.4", type: "connection" },
+        { source: "topic2.2", target: "topic3.2", type: "connection" },
+        { source: "topic2.2", target: "topic4.2", type: "connection" },
+        { source: "topic2.2", target: "topic5.3", type: "connection" },
+        { source: "topic2.3", target: "topic4.3", type: "connection" },
+        { source: "topic2.4", target: "topic5.5", type: "connection" },
+        { source: "topic2.5", target: "topic3.2", type: "connection" },
+        { source: "topic2.5", target: "topic4.2", type: "connection" },
+        { source: "topic2.5", target: "topic5.6", type: "connection" },
+        { source: "topic2.6", target: "topic3.3", type: "connection" },
+        { source: "topic2.6", target: "topic6.6", type: "connection" },
+        { source: "topic2.7", target: "topic3.4", type: "connection" },
+        { source: "topic2.7", target: "topic6.5", type: "connection" },
+        { source: "topic2.8", target: "topic3.3", type: "connection" },
+        { source: "topic2.8", target: "topic7.1", type: "connection" },
+        { source: "topic2.9", target: "topic3.4", type: "connection" },
+        { source: "topic2.10", target: "topic5.1", type: "connection" },
+        { source: "topic2.10", target: "topic6.6", type: "connection" },
+        
+        { source: "topic3.1", target: "topic6.1", type: "connection" },
+        { source: "topic3.2", target: "topic6.2", type: "connection" },
+        { source: "topic3.3", target: "topic7.4", type: "connection" },
+        { source: "topic3.4", target: "topic4.4", type: "connection" },
+        { source: "topic3.4", target: "topic6.3", type: "connection" },
+        { source: "topic3.4", target: "topic7.4", type: "connection" },
+        
+        { source: "topic4.1", target: "topic6.3", type: "connection" },
+        { source: "topic4.2", target: "topic6.3", type: "connection" },
+        { source: "topic4.3", target: "topic6.4", type: "connection" },
+        { source: "topic4.4", target: "topic3.4", type: "connection" },
+        
+        { source: "topic5.1", target: "topic7.1", type: "connection" },
+        { source: "topic5.2", target: "topic6.5", type: "connection" },
+        { source: "topic5.3", target: "topic6.2", type: "connection" },
+        { source: "topic5.4", target: "topic6.1", type: "connection" },
+        { source: "topic5.5", target: "topic2.4", type: "connection" },
+        { source: "topic5.6", target: "topic2.5", type: "connection" }
+      ];
+
+      // Set up fixed node positions for stability
+      const positions = {
+        "center": {x: 0, y: 0},
+        "unit1": {x: -350, y: -350},
+        "unit2": {x: 350, y: -350},
+        "unit3": {x: 500, y: 0},
+        "unit4": {x: 350, y: 350},
+        "unit5": {x: -350, y: 350},
+        "unit6": {x: -500, y: 0},
+        "unit7": {x: 0, y: -500}
+      };
+
+      // Set up the SVG container
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      const svg = d3.select("#mindmap-container")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height]);
+      
+      // Create a group for the mindmap
+      const g = svg.append("g")
+        .attr("transform", `translate(${width/2}, ${height/2})`);
+      
+      // Process nodes and links
+      const nodes = [];
+      const links = [];
+      
+      // Add the center node
+      const root = d3.hierarchy(mindmapData);
+      root.depth = 0;
+      
+      nodes.push({
+        id: root.data.id,
+        name: root.data.name,
+        description: root.data.description,
+        essentialKnowledge: root.data.essentialKnowledge || "",
+        equations: root.data.equations || "",
+        physicsC: root.data.physicsC || "",
+        connections: root.data.connections || [],
+        color: root.data.color,
+        radius: root.data.radius,
+        weight: root.data.weight || "",
+        depth: root.depth,
+        fx: positions[root.data.id] ? positions[root.data.id].x : null,
+        fy: positions[root.data.id] ? positions[root.data.id].y : null
+      });
+      
+      // Process child nodes and links
+      function processChildren(parent, depth) {
+        if (!parent.data.children) return;
+        
+        parent.data.children.forEach((child, i) => {
+          // Add node
+          const childNode = {
+            id: child.id,
+            name: child.name,
+            description: child.description,
+            essentialKnowledge: child.essentialKnowledge || "",
+            equations: child.equations || "",
+            physicsC: child.physicsC || "",
+            connections: child.connections || [],
+            color: child.color,
+            radius: child.radius,
+            weight: child.weight || "",
+            depth: depth,
+            fx: positions[child.id] ? positions[child.id].x : null,
+            fy: positions[child.id] ? positions[child.id].y : null
+          };
+          nodes.push(childNode);
+          
+          // Add link from parent to child
+          links.push({
+            source: parent.data.id,
+            target: child.id,
+            type: depth === 1 ? "main" : "topic"
+          });
+          
+          // Process grandchildren
+          if (child.children) {
+            processChildren({ data: child }, depth + 1);
+          }
+        });
+      }
+      
+      processChildren(root, 1);
+      
+      // Add connections from the connections array
+      connections.forEach(connection => {
+        // Check if the connection already exists
+        const exists = links.some(link => 
+          (link.source === connection.source && link.target === connection.target) ||
+          (link.source === connection.target && link.target === connection.source)
+        );
+        
+        if (!exists) {
+          links.push({
+            source: connection.source,
+            target: connection.target,
+            type: "connection"
+          });
+        }
+      });
+      
+      // Set up predefined positions for unit1's children
+      if (positions["unit1"]) {
+        const unit1Children = nodes.filter(node => 
+          node.id.startsWith("topic1.") && node.depth === 2
+        );
+        
+        const angle = Math.PI / 6; // 30 degrees
+        const radius = 150;
+        
+        unit1Children.forEach((node, i) => {
+          const theta = -Math.PI/2 - angle * 2 + i * angle;
+          node.fx = positions["unit1"].x + radius * Math.cos(theta);
+          node.fy = positions["unit1"].y + radius * Math.sin(theta);
+        });
+      }
+      
+      // Set up predefined positions for other units' children using similar patterns
+      for (let unitNum = 2; unitNum <= 7; unitNum++) {
+        const unitId = `unit${unitNum}`;
+        if (positions[unitId]) {
+          const unitChildren = nodes.filter(node => 
+            node.id.startsWith(`topic${unitNum}.`) && node.depth === 2
+          );
+          
+          const childCount = unitChildren.length;
+          const radius = 150;
+          
+          let startAngle, endAngle;
+          
+          switch(unitId) {
+            case "unit1": startAngle = -Math.PI/3; endAngle = Math.PI/3; break;
+            case "unit2": startAngle = -2*Math.PI/3; endAngle = 0; break;
+            case "unit3": startAngle = -5*Math.PI/6; endAngle = -Math.PI/6; break;
+            case "unit4": startAngle = -4*Math.PI/3; endAngle = -2*Math.PI/3; break;
+            case "unit5": startAngle = Math.PI/3; endAngle = 2*Math.PI/3; break;
+            case "unit6": startAngle = Math.PI/6; endAngle = 5*Math.PI/6; break;
+            case "unit7": startAngle = 0; endAngle = 2*Math.PI/3; break;
+            default: startAngle = 0; endAngle = 2*Math.PI; break;
+          }
+          
+          const angleStep = (endAngle - startAngle) / (childCount-1 || 1);
+          
+          unitChildren.forEach((node, i) => {
+            const theta = startAngle + i * angleStep;
+            node.fx = positions[unitId].x + radius * Math.cos(theta);
+            node.fy = positions[unitId].y + radius * Math.sin(theta);
+          });
+        }
+      }
+      
+      // Create links
+      const link = g.append("g")
+        .attr("class", "links")
+        .selectAll("line")
+        .data(links)
+        .enter().append("line")
+        .attr("class", d => `link ${d.type}-link`)
+        .attr("stroke-opacity", 0) // Start with invisible links
+        .attr("stroke-width", d => d.type === "main" ? 2 : (d.type === "topic" ? 1.5 : 1))
+        .attr("stroke-dasharray", d => d.type === "connection" ? "5,5" : "none");
+
+      // Create node groups
+      const node = g.append("g")
+        .attr("class", "nodes")
+        .selectAll(".node")
+        .data(nodes)
+        .enter().append("g")
+        .attr("class", "node")
+        .attr("id", d => `node-${d.id}`)
+        .on("click", function(event, d) { showInfo(event, d); })
+        .on("mouseover", function(event, d) { handleMouseOver(event, d); })
+        .on("mouseout", function(event, d) { handleMouseOut(event, d); });
+      
+      // Add circles to nodes
+      node.append("circle")
+        .attr("r", d => d.radius)
+        .attr("fill", d => d.color)
+        .attr("stroke", "#FFFFFF")
+        .attr("stroke-width", d => d.depth === 0 ? 3 : (d.depth === 1 ? 2 : 1.5));
+      
+      // Add text to nodes
+      node.append("text")
+        .attr("dy", d => d.depth === 0 ? "0" : "0")
+        .attr("text-anchor", "middle")
+        .text(d => d.name)
+        .attr("font-size", d => d.depth === 0 ? "18px" : (d.depth === 1 ? "14px" : "12px"))
+        .attr("font-weight", d => d.depth <= 1 ? "bold" : "normal");
+      
+      // Add weight text to unit nodes
+      node.filter(d => d.depth === 1)
+        .append("text")
+        .attr("dy", "15")
+        .attr("text-anchor", "middle")
+        .attr("class", "topic-text")
+        .text(d => d.weight)
+        .attr("font-size", "10px");
+      
+      // Directly position nodes based on their fixed positions
+      function updateNodePositions() {
+        node.attr("transform", d => {
+          let x = d.fx || 0;
+          let y = d.fy || 0;
+          return `translate(${x}, ${y})`;
+        });
+      }
+      
+      // Update link positions based on node positions
+      function updateLinkPositions() {
+        link.attr("x1", d => {
+          const sourceNode = nodes.find(n => n.id === d.source);
+          return sourceNode.fx || 0;
+        })
+        .attr("y1", d => {
+          const sourceNode = nodes.find(n => n.id === d.source);
+          return sourceNode.fy || 0;
+        })
+        .attr("x2", d => {
+          const targetNode = nodes.find(n => n.id === d.target);
+          return targetNode.fx || 0;
+        })
+        .attr("y2", d => {
+          const targetNode = nodes.find(n => n.id === d.target);
+          return targetNode.fy || 0;
+        });
+      }
+      
+      updateNodePositions();
+      updateLinkPositions();
+      
+      // Mouse over function to show related links
+      function handleMouseOver(event, d) {
+        // Show links connected to this node
+        link.each(function(l) {
+          const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+          const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sourceId === d.id || targetId === d.id) {
+            d3.select(this).style("stroke-opacity", 0.7);
+          }
+        });
+      }
+      
+      // Mouse out function to hide links
+      function handleMouseOut() {
+        // Hide all links
+        link.each(function() {
+          d3.select(this).style("stroke-opacity", 0);
+        });
+      }
+      
+      // Set up zoom behavior
+      const zoom = d3.zoom()
+        .scaleExtent([0.2, 3])
+        .on("zoom", (event) => {
+          g.attr("transform", event.transform);
+        });
+      
+      svg.call(zoom);
+      
+      // Initial zoom to fit everything
+      svg.call(zoom.transform, d3.zoomIdentity.scale(0.7).translate(width/2, height/2));
+      
+      // Function to show topic information
+      function showInfo(event, d) {
+        // Prevent event from bubbling
+        event.stopPropagation();
+        
+        // Get the info panel and update content
+        const infoPanel = document.getElementById("info-panel");
+        const infoContent = document.getElementById("info-content");
+        
+        // Generate equations HTML if there are equations
+        let equationsHTML = "";
+        if (d.equations && d.equations.trim() !== "") {
+          equationsHTML = `
+            <h3>Key Equations</h3>
+            <div class="info-equations">
+              ${renderEquations(d.equations)}
+            </div>
+          `;
+        }
+        
+        // Generate Physics C equations HTML if there are any
+        let physicsCHTML = "";
+        if (d.physicsC && d.physicsC.trim() !== "") {
+          physicsCHTML = `
+            <button class="physics-c-button" onclick="togglePhysicsC('${d.id}')">Show/Hide AP Physics C: Mechanics Details</button>
+            <div id="physics-c-${d.id}" class="physics-c-equations">
+              ${renderEquations(d.physicsC)}
+            </div>
+          `;
+        }
+        
+        // Generate connections HTML
+        let connectionsHTML = "";
+        const relatedNodes = new Set();
+        
+        // Find all links connected to this node
+        links.forEach(link => {
+          if (link.source === d.id) {
+            relatedNodes.add(link.target);
+          } else if (link.target === d.id) {
+            relatedNodes.add(link.source);
+          }
+        });
+        
+        // If there are connections, generate HTML for them
+        if (relatedNodes.size > 0) {
+          const connectionsList = Array.from(relatedNodes).map(nodeId => {
+            const relatedNode = nodes.find(node => node.id === nodeId);
+            if (relatedNode) {
+              return `<li><strong>${relatedNode.name}</strong> (${relatedNode.id})</li>`;
+            }
+            return "";
+          }).join('');
+          
+          connectionsHTML = `
+            <h3>Related Topics</h3>
+            <ul class="connections-list">
+              ${connectionsList}
+            </ul>
+          `;
+        }
+        
+        // Update the info panel content
+        infoContent.innerHTML = `
+          <h2>${d.name}${d.weight ? ` <span style="font-size: 14px; font-weight: normal;">(${d.weight})</span>` : ''}</h2>
+          <p>${d.description}</p>
+          
+          ${d.essentialKnowledge ? `<h3>Essential Knowledge</h3><p>${d.essentialKnowledge}</p>` : ''}
+          
+          ${equationsHTML}
+          ${physicsCHTML}
+          ${connectionsHTML}
+        `;
+        
+        // Show the info panel
+        infoPanel.classList.add("active");
+        
+        // Render the MathJax content for proper equation display
+        if (window.MathJax && typeof window.MathJax.typeset === 'function') {
+          try {
+            // Use a setTimeout to ensure MathJax has time to process
+            setTimeout(function() {
+              window.MathJax.typeset();
+            }, 100);
+          } catch (e) {
+            console.error("MathJax typeset error:", e);
+          }
+        }
+      }
+      
+      // Helper function to format equations with MathJax
+      function renderEquations(equationsText) {
+        return equationsText.split('\\\\').map(eq => {
+          if (eq.trim().length === 0) return '';
+          return `<div class="equation">\\(${eq}\\)</div>`;
+        }).join('');
+      }
+      
+      // Toggle function for Physics C equations
+      window.togglePhysicsC = function(id) {
+        const physicsCElement = document.getElementById(`physics-c-${id}`);
+        if (physicsCElement) {
+          physicsCElement.style.display = physicsCElement.style.display === 'block' ? 'none' : 'block';
+          // Re-render MathJax when shown
+          if (physicsCElement.style.display === 'block' && window.MathJax && typeof window.MathJax.typeset === 'function') {
+            try {
+              setTimeout(function() {
+                window.MathJax.typeset();
+              }, 100);
+            } catch (e) {
+              console.error("MathJax typeset error:", e);
+            }
+          }
+        }
+      };
+      
+      // Close info panel when close button is clicked
+      document.querySelector(".close-button").addEventListener("click", () => {
+        document.getElementById("info-panel").classList.remove("active");
+      });
+      
+      // Close info panel when clicking outside
+      document.addEventListener("click", function(event) {
+        if (!event.target.closest("#info-panel") && !event.target.closest(".node")) {
+          document.getElementById("info-panel").classList.remove("active");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
